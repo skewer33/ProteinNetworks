@@ -1,5 +1,7 @@
 # ProteinNetworks
-2. [Some paragraph](#paragraph1)
+
+The library contains convenient tools for rapid analysis of gene ontology, enrichment and protein-protein interaction data. Based on the [`stringdb`](https://pypi.org/project/stringdb/) library. Some features require you to install [R](https://www.r-project.org/) to work (see [`EnrichmentAnalysis.prioretizingGO()`](#prioretizingGO))
+
 ### The module will contain 4 sets of tools:
   * **Enrichment Analysis** 
   * **Protein networks Analysis**
@@ -125,7 +127,7 @@ function makes gene mapping, it finds STRINGids by protein ids. It`s important f
 
 #### <a name="prioretizingGO"></a> prioretizingGO(terms: [<class 'list'>, <class 'set'>], organism='Human', domain='BP')
 
-function for prioretizing GO-terms using R script with GOxploreR package (doi:10.1038/s41598-020-73326-3)
+function for prioretizing GO-terms using R script with [GOxploreR](https://cran.r-universe.dev/GOxploreR/doc/manual.html) package ([doi:10.1038/s41598-020-73326-3](https://www.nature.com/articles/s41598-020-73326-3))
 See ‘RScript Prioretizing_GO.R’
 work with R.4-3.x. Yoy need to add RScript in PATH
 

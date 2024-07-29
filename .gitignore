@@ -1,0 +1,3 @@
+/setup.cfg
+*.txt
+/ProteinNetworks/__pycache__

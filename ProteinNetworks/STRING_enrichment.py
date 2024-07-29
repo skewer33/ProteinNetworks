@@ -1,12 +1,20 @@
+#import sys
+#
+#sys.path.insert(1, os.path.dirname(os.path.abspath(__file__)))
+#from   .R_requests import Check_R_packages, short_R_output
+
 from   datetime import datetime
 import functools
 from   math import log
 import os
 import pandas as pd
 import stringdb
-import subprocess
+from   subprocess import Popen, PIPE
 from   tabulate import tabulate
 
+
+# path to directory contains all RScripts
+RSCRIPTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'RScripts')
 
 def display_df(df):
     """
@@ -49,7 +57,6 @@ def print_upline(title:str, line_length:int=40):
     """
     line = '_'*line_length
     print(f'\t{title}\n{line}')
-
 
 def titler(title: str, line_length=40):
     """
@@ -152,7 +159,7 @@ class EnrichmentAnalysis:
                 print('Dropped genes from original set:\n', *list(duplicates.protein_id_type))
         return duplicates
 
-    def get_category_terms(self, category:str, term_type:set='id')->set:
+    def get_category_terms(self, category:str, term_type:str='id')->set:
         """
         function returns set of all terms in chosen category
         :param category: Name of category
@@ -166,9 +173,6 @@ class EnrichmentAnalysis:
         Check_Value(category, valid_category, 'category')
         Check_Value(term_type, {'description', 'id'}, 'term_type')
         return set(self.enrichment[d_term[term_type]][self.enrichment.category == category])
-
-    def _get_script_path(self):
-        return os.path.dirname(os.path.abspath(__file__))
 
     def get_enrichment(self):
         """
@@ -194,9 +198,11 @@ class EnrichmentAnalysis:
         under compartments genes
         Example: get_genes_by_localization([Nucleus, Cytosol], 'union') return proteins localized in Nucleus or Cytosol
 
-        compartments: list of compartments. Will be attention:
+        :param compartments: list of compartments. Will be attention:
             1) Capitalization of letters matters. Get available compartment names by calling "get_components_list()".
             2) Order of compartments matter if you want to get sets difference.
+        :param set_operation: operation between sets. This means that the operations will be applied sequentially to all
+         sets from the compartments.
             For example:
                 get_genes_by_localization(['Nucleus', 'Cytosol'], 'difference') return just nucleus proteins,
                 get_genes_by_localization(['Cytosol', 'Nucleus'], 'union') return cytosol and nucleus proteins.
@@ -259,6 +265,11 @@ class EnrichmentAnalysis:
 
     @titler('MAPPING GENES IN STRING')
     def get_mapped(self, species=9606):
+        """
+        function makes gene mapping, it finds STRINGids by protein ids. It`s important for future analysis
+        :param species: ID of organism. For example, Human species=9606
+        :return: None
+        """
 
         self.genes_mapped = stringdb.get_string_ids(self.proteins, species=species)
         self.nomapped_genes, self.overmapped_genes = self._find_nomapped_genes()
@@ -275,6 +286,9 @@ class EnrichmentAnalysis:
         See 'RScript Prioretizing_GO.R'
         work with R.4-3.x. Yoy need to add RScript in PATH
 
+        If you use this function in google-collab, you will have to install R-packages at the first launch.
+        This may take a long time (up to 20 minutes)
+
         :param terms: list of GO-terms
         :param organism: name of target organism
         :param domain: name of domain in GO-graph. Available inputs: 'BP' - Biological Process
@@ -289,22 +303,34 @@ class EnrichmentAnalysis:
         Check_Value(organism, valid_organisms, 'organism')
         Check_Value(domain, {'BP', 'MF', 'CC'}, 'domain')
 
-        self.save_table(pd.DataFrame(terms, columns=['Term']), 'temp_enrich_terms.csv', saveformat='csv', index=False)
+        installing = Check_R_packages(CRAN_packages=["GOxploreR", "data.table", "BiocManager", "utils", "ggplot2"],
+                         BiocManager_packages=["GO.db", "annotate", "biomaRt"])
+
+        self.save_table(pd.DataFrame(terms, columns=['Term']), 'input_priority_terms.csv', saveformat='csv', index=False)
 
         # Request to CMD to execute RScript
         command = 'Rscript'
-        path2script = f'{self._get_script_path()}\\Prioretizing_GO.R'
-        path2file = f'{os.getcwd()}\\temp_enrich_terms.csv'
+        path2script = os.path.join(RSCRIPTS_PATH, 'Prioretizing_GO.R')
+        path2file = os.path.abspath('input_priority_terms.csv')
 
         # Variable number of args in a list
         args = [path2file, 'Human', 'BP']
         # Build subprocess command
         cmd = [command, path2script] + args
         # check_output will run the command and store to result
-        x = subprocess.check_output(cmd, universal_newlines=True)
-        print(x)
+        p = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        output, error = p.communicate()
 
-        prior_terms = pd.read_csv(f'{os.getcwd()}\\temp_enrich_terms_output.csv')
+        # PRINT R CONSOLE OUTPUT (ERROR OR NOT)
+        if p.returncode == 0:
+            if installing:
+                print('All R-packages were installed successfully')
+            s_output = short_R_output(output.decode("utf8")) # if all is OK, then makes short output
+            print(f'R OUTPUT:\n {s_output}')
+        else:
+            print(f'R ERROR:\n {error.decode("utf8")}')
+
+        prior_terms = pd.read_csv(os.path.abspath('output_priority_terms.csv'))
         return list(prior_terms.Term)
 
     def proteins_participation_in_the_category(self, df, category, term_type='id', term_sep='\n'):
@@ -315,7 +341,7 @@ class EnrichmentAnalysis:
         :param term_type: 'id' or 'description'.
                 id - returns terms IDs of category (for example, GO terms)
                 description - returns Description of IDs of category
-        :param term_sep:
+        :param term_sep: terms connected with each protein will save in one cell. Choose separator beetwen terms
         :return:
         """
         d_term = {'id': 'term', 'description': 'description'} # dict associate term_type and colnames of enrichment table
@@ -354,7 +380,6 @@ class EnrichmentAnalysis:
         Check_Value(category, valid_category, 'category')
         Check_Value(sort_by, {'genes', 'term'}, 'sort_by')
 
-
         table = []
         category_data = self.enrichment[self.enrichment.category == category]
         terms = self.get_category_terms(category, term_type='description')
@@ -368,7 +393,8 @@ class EnrichmentAnalysis:
             df.sort_values('Term', ascending = True, inplace=True)
         if show == 'all':
             display_df(df)
-        else: display_df(df.head(show))
+        else:
+            display_df(df.head(show))
 
         if save:
             if savename == 'terms':

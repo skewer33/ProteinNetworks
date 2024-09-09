@@ -1,3 +1,7 @@
-/setup.cfg
+setup*
 *.txt
 /ProteinNetworks/__pycache__
+.gitignore
+/build
+/dist
+/ProteinNetworks.egg-info

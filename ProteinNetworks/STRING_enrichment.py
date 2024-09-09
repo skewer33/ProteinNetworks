@@ -1,7 +1,4 @@
-#import sys
-#
-#sys.path.insert(1, os.path.dirname(os.path.abspath(__file__)))
-#from   .R_requests import Check_R_packages, short_R_output
+from   .R_requests import Check_R_packages, short_R_output
 
 from   datetime import datetime
 import functools

@@ -6,7 +6,7 @@ from   subprocess import Popen, PIPE
 # path to directory contains all RScripts
 RSCRIPTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'RScripts')
 
-def Check_R_packages(CRAN_packages:list=[], BiocManager_packages:list=[]) -> bool:
+def Check_R_packages(CRAN_packages:None, BiocManager_packages:None) -> bool:
     """
     function checks target R-packages among installed R-packages
     function makes CMD request to RScript
@@ -14,6 +14,10 @@ def Check_R_packages(CRAN_packages:list=[], BiocManager_packages:list=[]) -> boo
     :param BiocManager_packages: list of BiocManager packages to check
     :return:
     """
+    # if CRAN_packages is None, then CRAN_packages = empty list
+    CRAN_packages = CRAN_packages or []
+    BiocManager_packages = BiocManager_packages or []
+
     s = ''
     for p in CRAN_packages:
         s += str(p) + ','  # s - temp string contained all target CRAN-package names

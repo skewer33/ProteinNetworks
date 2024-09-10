@@ -8,6 +8,10 @@ The library contains convenient tools for rapid analysis of gene ontology, enric
   * **Group comparing tools**
   * **Visualization tools**
 
+## Get Started
+
+`pip install -i https://test.pypi.org/simple/ ProteinNetworks==0.1.3`
+
 ## Contents:
 
 * [Enrichment Analysis](#EnrichmentAnalysis)
@@ -34,7 +38,7 @@ The library contains convenient tools for rapid analysis of gene ontology, enric
 _________________________
 
 
-# EnrichmentAnalysis
+# <a name='EnrichmentAnalysis'></a> Enrichment Analysis
 Contains a set of functions based on the stringdb library for gene ontology analysis and enrichment analysis
 Look examples in [Colab Notebook](https://drive.google.com/file/d/1JlcrtDNwOVLuKmwDy4apfIpt7Mheu4cF/view?usp=sharing)
 

@@ -73,7 +73,18 @@ def Check_R_packages(CRAN_packages:None, BiocManager_packages:None) -> bool:
     return installing
 
 def short_R_output(text):
+    """
+    function for shortening R output string. It takes string as parameter and return new string which
+    contains only lines that starts with '[1]'
+    This allows you to remove system messages, leaving only messages transmitted via 'print'
+    
+    :param text: text to be shortened
+    :return: shortened text
+    """
     df = pd.DataFrame(text.split('\n'), columns=['text'])
-    new_text = df.text[df.text.str.contains('[1]')].apply(lambda x: x.strip('[1] ').rstrip('\n')).apply(
+    new_text = df.text[df.text.apply(lambda x: True if x.find('[1]') >= 0 else False )].apply(lambda x: x.strip('[1] ').rstrip('\n')).apply(
                     lambda x: str(x) + '\n').sum()
+    #isn`t working, for some reason 'contains' includs extra lines
+    #new_text = df.text[df.text.str.contains('[1]')].apply(lambda x: x.strip('[1] ').rstrip('\n')).apply(
+    #                lambda x: str(x) + '\n').sum()
     return new_text

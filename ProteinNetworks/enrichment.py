@@ -1,4 +1,5 @@
 from   .R_requests import Check_R_packages, short_R_output
+from   .wrappers import Check_Value, display_df, titler, print_upline, print_downline, save_table, create_subframe_by_names
 
 from   datetime import datetime
 import functools
@@ -13,76 +14,56 @@ from   tabulate import tabulate
 # path to directory contains all RScripts
 RSCRIPTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'RScripts')
 
-def display_df(df):
-    """
-    function for displaying DataFrames (df). If IPNB is used, df will display with common IPNB function 'Display', else:
-    it will display by print() function
-    :param df: DataFrame
-    :return:
-    """
-    try: display(df)
-    except: print(df)
 
-def Check_Value(val:[str, float, int], valid_values:set, valname:str, message='Wrong value123'):
+def get_enrichment(proteins, protein_id_type='Gene', species=9606, silent=True):
     """
-    function for check correctness of input value
-    :param val: input value
-    :param valid_values: set of valid values
-    :param valname: group name of valid_values set. Or name of val variable
-    :param message: Error message
-    :return:
-    """
-    if val not in valid_values:
-        if message == 'Wrong value123':
-            message = f'Wrong value of "{valname}" variable! Choose one of {valid_values}'
-        raise Exception(message)
+    Function for one-click presetted enrichment analysis. It creates EnrichmentAnalysis object with your data,
+    drops duplicates, maps protein IDs to STRING IDs, makes enrichment analysis and shows
+    enrichment categories.
 
-def print_downline(line_length:int=40):
-    """
-    function prints line for titler decorator
-    :param line_length:
-    :return:
-    """
-    line = '_'*line_length
-    print(f'{line}\n\n')
+    Parameters
+    ----------
+    proteins : pd.DataFrame
+        DataFrame with protein IDs. It must contain either a "Gene" or "UniProtID" column
+    protein_id_type : str
+        Type of protein ID. Valid types: 'Gene', 'UniProtID'
+    species : int
+        Species ID. For example, human species ID = 9606
+    silent : bool
+        If True, then function will not print anything
 
-def print_upline(title:str, line_length:int=40):
+    Returns
+    -------
+    EnrichmentAnalysis
+        EnrichmentAnalysis object
     """
-    function prints line and adds title for titler decorator
-    :param line_length:
-    :return:
-    """
-    line = '_'*line_length
-    print(f'\t{title}\n{line}')
-
-def titler(title: str, line_length=40):
-    """
-    Decorator added Title and edges of Paragraph
-    :param title: title
-    :param line_length: length of line (number of '_' symbols)
-    :return:
-    """
-    def titler_decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            print_upline(title, line_length)
-            original_result = func(*args, **kwargs)
-            print_downline(line_length)
-
-            return original_result
-        return wrapper
-    return titler_decorator
+    obj = EnrichmentAnalysis(proteins, protein_id_type=protein_id_type)
+    obj.drop_duplicated_genes(silent=silent) # drop duplicates from your protein id set
+    obj.get_mapped(species=species) # find STRINGid for each protein id
+    obj.get_enrichment() # make enrichment
+    obj.show_enrichment_categories() # get enrichment category
+    return obj
 
 
 class EnrichmentAnalysis:
     types = {'UniProtID': 'queryItem', 'Gene': 'preferredName'}
 
-    def __init__(self, data, enrichment = None, protein_id_type='UniProtID'):
+    def __init__(self, data, enrichment = None, protein_id_type='Gene'):
         """
         EnrichmentAnalysis class conctructor.
-        :param data: Dataframe containing the protein ID for analysis. It must contain either a "Gene" or "UniProtID" column'
-        :param enrichment: Dataframe containing the results of previous enrichment analysis
-        :param protein_id_type: type of protein ID. Valid Types
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Dataframe containing the protein ID for analysis. It must contain either a "Gene" or "UniProtID" column
+        enrichment : pd.DataFrame, optional
+            Dataframe containing the results of previous enrichment analysis
+        protein_id_type : str, optional
+            type of protein ID. Valid Types
+
+        Returns
+        -------
+        None
         """
         #check correctness of inputs
         self.protein_id_type = protein_id_type
@@ -94,10 +75,18 @@ class EnrichmentAnalysis:
 
     def _check_proteins_column(self, data):
         """
-        the function checks the presence of the 'Gene' and 'UniProtID' columns in data
-        :param data: data contains proteins` IDs
-        :return:
+        The function checks the presence of the 'Gene' and 'UniProtID' columns in data
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            data contains proteins` IDs
+
+        Returns
+        -------
+        None
         """
+
         valid_cols = set(self.types.keys()).intersection(data.columns)
         if len(valid_cols) == 0:
             message = 'The protein data must contain either a "Gene" or "UniProtID" column'
@@ -121,32 +110,47 @@ class EnrichmentAnalysis:
 
     def _find_nomapped_genes(self):
         """
-        check genes in dataset which didn`t find by STRING (nomapped genes) and
+        check genes in dataset which didn't find by STRING (nomapped genes) and
         found by STRING but wasn`t in dataset (overmapped genes)
+        
+        Parameters
+        ----------
+        None
 
-        :return: sorted list of nomapped and overmapped genes
+        Returns
+        -------
+        tuple
+            tuple of two sorted lists. First list contains nomapped genes and second list contains overmapped genes.
         """
         nomapped = sorted(
             set(self.proteins.unique()).difference(set(self.genes_mapped[self.types[self.protein_id_type]].unique())))
         overmapped = sorted(
             set(self.genes_mapped[self.types[self.protein_id_type]].unique()).difference(set(self.proteins.unique())))
         return nomapped, overmapped
-
+    
     @titler('DISCARDING DUPLICATES')
     def drop_duplicated_genes(self, silent=False):
         """
-        function for droppig dublicated genes
+        Function for droppig dublicated genes
+        
+        Parameters
+        ----------
+        subset : list, optional
+            Only consider certain columns for identifying duplicates, by default use all columns.
 
-        subset: (list) Only consider certain columns for identifying duplicates, by default use all columns.
-        return: df of dropped genes
+        Returns
+        -------
+        pd.DataFrame
+            df of dropped genes
         """
+        
         subset = self.protein_id_type
         len_orig_set = len(self.orig_data)
         duplicates = self.orig_data[self.orig_data.duplicated(subset=subset)]
         self.orig_data.drop_duplicates(subset=subset, inplace=True)
         self.proteins = self.orig_data[self.protein_id_type]
         if not silent:
-            print(f'{len(duplicates)} of {len_orig_set} genes was dropped from original set')
+            print(f'{len(duplicates)} of {len_orig_set} genes were dropped from original set')
             if len(duplicates) < 1:
                 return duplicates
             elif len(duplicates) < 20:
@@ -158,12 +162,19 @@ class EnrichmentAnalysis:
 
     def get_category_terms(self, category:str, term_type:str='id')->set:
         """
-        function returns set of all terms in chosen category
-        :param category: Name of category
-        :param term_type: 'id' or 'description'.
-                id - returns terms IDs of category (for example, GO terms)
-                description - returns Description of IDs of category
-        :return: set of terms
+        Parameters
+        ----------
+        category : str
+            Name of category
+        term_type : str
+            'id' or 'description'.
+            id - returns terms IDs of category (for example, GO terms)
+            description - returns Description of IDs of category
+
+        Returns
+        -------
+        set
+            set of terms
         """
         d_term = {'id': 'term', 'description': 'description'} # dict associate term_type and colnames of enrichment table
         valid_category = self._get_valid_category()
@@ -173,17 +184,29 @@ class EnrichmentAnalysis:
 
     def get_enrichment(self):
         """
-        function performs enrichment analysis. Results store in self.enrichment
-        :return:
+        Function performs enrichment analysis. Results store in self.enrichment
+        Parameters
+        ----------
+        None
+        
+        Returns
+        -------
+        None
         """
         self.enrichment = stringdb.get_enrichment(self.genes_mapped.queryItem) #get enrichment
         self.enrichment['enrich_score'] = self.enrichment.fdr.apply(lambda x: round(-log(x, 2), 1)) #get enrichment score
 
     def get_genes_of_term(self, term:str)-> list:
         """
-        function get genes from enrichment table by target term
-        :param term: target GO term from column 'term' in enrichment table
-        :return: list of genes associated with target term
+        Parameters
+        ----------
+        term : str
+            target GO term from column 'term' in enrichment table
+
+        Returns
+        -------
+        list
+            list of genes associated with target term
         """
         try:
             return self.enrichment.inputGenes[self.enrichment.term == term].to_list()[0].rstrip().strip().split(',')
@@ -191,19 +214,27 @@ class EnrichmentAnalysis:
 
     def get_genes_by_localization(self, compartments: list, set_operation: str, save=False):
         """
-        function for getting proteins localized in target compartments. You also can do common set operations
+        Function for getting proteins localized in target compartments. You also can do common set operations
         under compartments genes
         Example: get_genes_by_localization([Nucleus, Cytosol], 'union') return proteins localized in Nucleus or Cytosol
 
-        :param compartments: list of compartments. Will be attention:
-            1) Capitalization of letters matters. Get available compartment names by calling "get_components_list()".
-            2) Order of compartments matter if you want to get sets difference.
-        :param set_operation: operation between sets. This means that the operations will be applied sequentially to all
-         sets from the compartments.
+        Parameters
+        ----------
+        compartments : list
+            list of compartments. Will be attention:
+                1) Capitalization of letters matters. Get available compartment names by calling "get_components_list()".
+                2) Order of compartments matter if you want to get sets difference.
+        set_operation : str
+            operation between sets. This means that the operations will be applied sequentially to all
+            sets from the compartments.
             For example:
                 get_genes_by_localization(['Nucleus', 'Cytosol'], 'difference') return just nucleus proteins,
                 get_genes_by_localization(['Cytosol', 'Nucleus'], 'union') return cytosol and nucleus proteins.
                 get_genes_by_localization(['all', 'Nucleus'], 'difference') return all proteins except nucleus proteins.
+
+        Returns
+        -------
+        set of proteins localized in target compartments
         """
         # check set_operation and compartments error
         Check_Value(set_operation, {'union', 'intersection', 'difference', 'symmetric_difference'}, 'set_operation')
@@ -246,7 +277,7 @@ class EnrichmentAnalysis:
                 compartment_genes = set(component_data.inputGenes[component_data.description == compartments[i]]
                                         .to_list()[0].rstrip().strip().split(','))
             loc_genes = operations[set_operation](loc_genes, compartment_genes)
-        print(f'{len(loc_genes)} genes was founded\n')
+        print(f'{len(loc_genes)} genes were founded\n')
 
         if save: # save genes in txt format (1 gene on 1 string)
             filename = 'Genes_' + '_'.join(compartments)
@@ -258,14 +289,20 @@ class EnrichmentAnalysis:
                     f.write(term + '\n')
             print(f'File {filename} successfully saved in {os.path.abspath(os.getcwd())}\n')
 
-        return list(loc_genes)
+        #return list(loc_genes)
+        return pd.DataFrame({self.protein_id_type: list(loc_genes)})
 
     @titler('MAPPING GENES IN STRING')
     def get_mapped(self, species=9606):
         """
-        function makes gene mapping, it finds STRINGids by protein ids. It`s important for future analysis
-        :param species: ID of organism. For example, Human species=9606
-        :return: None
+        Parameters
+        ----------
+        species : int, optional
+            ID of organism. For example, Human species=9606. Default is 9606.
+
+        Returns
+        -------
+        None
         """
 
         self.genes_mapped = stringdb.get_string_ids(self.proteins, species=species)
@@ -277,21 +314,61 @@ class EnrichmentAnalysis:
         if len(self.overmapped_genes) < 80:
             print('List of overmapped genes:\n', list(self.overmapped_genes))
 
+    def get_terms_prioretizing(self, category, sorting_results=True, ascending=False):
+        
+        """
+        Function for prioretizing GO-terms from choosen category
+        
+        Parameters
+        ----------
+        obj : EnrichmentAnalysis
+            EnrichmentAnalysis object
+        category : str
+            name of category
+
+        Returns
+        -------
+        **pd.DataFrame** enrichment table of prioretized Terms, stored in *self.prior_enrichment[category]*
+        """
+        #check validness of category
+        valid_category = self._get_valid_category()
+        Check_Value(category, valid_category, 'category')
+        
+        GO_terms = self.get_category_terms(category)
+        prior_GO_terms = self.prioretizingGO(GO_terms)
+        try:
+            self.prior_enrichment[category] = create_subframe_by_names(self.enrichment, column='term', names=prior_GO_terms)
+        except:
+            self.prior_enrichment = {}
+            self.prior_enrichment[category] = create_subframe_by_names(self.enrichment, column='term', names=prior_GO_terms)
+        if sorting_results:
+            self.prior_enrichment[category].sort_values(by=['enrich_score'], ascending=ascending, inplace=True)
+        return self.prior_enrichment[category]
+        
+
     def prioretizingGO(self, terms: [list, set], organism='Human', domain='BP'):
         """
-        function for prioretizing GO-terms using R script with GOxploreR package (doi:10.1038/s41598-020-73326-3)
+        Function for prioretizing GO-terms using R script with GOxploreR package (doi:10.1038/s41598-020-73326-3)
         See 'RScript Prioretizing_GO.R'
-        work with R.4-3.x. Yoy need to add RScript in PATH
+        work with R.4-3.x. You need to add RScript in PATH
 
         If you use this function in google-collab, you will have to install R-packages at the first launch.
         This may take a long time (up to 20 minutes)
 
-        :param terms: list of GO-terms
-        :param organism: name of target organism
-        :param domain: name of domain in GO-graph. Available inputs: 'BP' - Biological Process
-			            											 'CC' - Cellular Component
-            														 "MF" - Molecular Functions
-        :return: list of Prioretized GO terms
+        Parameters
+        ----------
+        terms : list or set
+            list of GO-terms
+        organism : str
+            name of target organism
+        domain : str
+            name of domain in GO-graph. Available inputs: 'BP' - Biological Process
+                                                     'CC' - Cellular Component
+                                                     "MF" - Molecular Functions
+
+        Returns
+        -------
+        list of Prioretized GO terms
         """
         valid_organisms = {"Homo Sapiens", "Human", "Rattus Norvegicus", "Rat", "Mus Musculus", "Mouse",
                            "Danio Rerio", "Zebrafish", "Caenorhabditis Elegans", "Worm", "Arabidopsis Thaliana",
@@ -303,7 +380,7 @@ class EnrichmentAnalysis:
         installing = Check_R_packages(CRAN_packages=["GOxploreR", "data.table", "BiocManager", "utils", "ggplot2"],
                          BiocManager_packages=["GO.db", "annotate", "biomaRt"])
 
-        self.save_table(pd.DataFrame(terms, columns=['Term']), 'input_priority_terms.csv', saveformat='csv', index=False)
+        save_table(pd.DataFrame(terms, columns=['Term']), 'input_priority_terms.csv', saveformat='csv', index=False)
 
         # Request to CMD to execute RScript
         command = 'Rscript'
@@ -332,14 +409,25 @@ class EnrichmentAnalysis:
 
     def proteins_participation_in_the_category(self, df, category, term_type='id', term_sep='\n'):
         """
-        function check terms that proteins participated and make statistics table
-        :param df: target DataFrame
-        :param category: Name of category
-        :param term_type: 'id' or 'description'.
-                id - returns terms IDs of category (for example, GO terms)
-                description - returns Description of IDs of category
-        :param term_sep: terms connected with each protein will save in one cell. Choose separator beetwen terms
-        :return:
+        Function check terms that proteins participated and make statistics table
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            target DataFrame
+        category : str
+            Name of category
+        term_type : str
+            'id' or 'description'.
+            id - returns terms IDs of category (for example, GO terms)
+            description - returns Description of IDs of category
+        term_sep : str
+            terms connected with each protein will save in one cell. Choose separator beetwen terms
+
+        Returns
+        -------
+        pd.DataFrame
+            table with protein`s participation in category
         """
         d_term = {'id': 'term', 'description': 'description'} # dict associate term_type and colnames of enrichment table
         valid_category = self._get_valid_category()
@@ -362,13 +450,22 @@ class EnrichmentAnalysis:
     def show_category_terms(self, category:str, show:[int, str]=10, sort_by='genes',
                             save:bool = False, savename='terms', saveformat='xlsx')->None:
         """
-        function displays  all terms and number of associated genes in category
-        :param category: Name of category. You can check available category by calling 'show_enrichment_categories' method
-        :param show: "all" or integer number. Number of strings to display
-        :param sort_by: ["genes", "term"] - sort by number of genes (by descending) or term names (by ascending)
-        :param save: Need to save? Choose True. By default, save in .xlsx format
-        :param savename: work with save=True, name of file
-        :param saveformat: format of saving file: 'xlsx' or 'csv'
+        Function displays all terms and number of associated genes in category
+
+        Parameters
+        ----------
+        category : str
+            Name of category. You can check available category by calling 'show_enrichment_categories' method
+        show : int or str
+            "all" or integer number. Number of strings to display
+        sort_by : str
+            ["genes", "term"] - sort by number of genes (by descending) or term names (by ascending)
+        save : bool
+            Need to save? Choose True. By default, save in .xlsx format
+        savename : str
+            work with save=True, name of file
+        saveformat : str
+            format of saving file: 'xlsx' or 'csv'
         """
 
         if type(show) != int and show != 'all':
@@ -380,6 +477,7 @@ class EnrichmentAnalysis:
         table = []
         category_data = self.enrichment[self.enrichment.category == category]
         terms = self.get_category_terms(category, term_type='description')
+        
         for term in terms:
             string = category_data[category_data.description == term]
             table.append([term, list(string.number_of_genes)[0]])
@@ -402,105 +500,58 @@ class EnrichmentAnalysis:
     def show_enrichment_categories(self):
         """
         function shown available enrichment categories for current dataset
-        :return: None
+        
+        Parameters
+        ----------
+        None
+        
+        Returns
+        -------
+        None
         """
         table = []
         for term in self.enrichment.category.unique():
             table.append([term, len(self.enrichment[self.enrichment.category == term])])
         print(tabulate(table, headers=['Category', 'Number of terms'], tablefmt='orgtbl'))
 
-    def show_enrichest_terms_in_category(self, category: str, count: int = 10, sort_by='fdr',
+    def show_enrichest_terms_in_category(self, category: str, count: [int, str]='all', sort_by='fdr',
                                          save: bool = False, savename='enrichment', saveformat='xlsx'):
         """
-        function shows top-%count of most enriched terms in %category
-        :param category: Name of category. You can check available category by calling 'show_enrichment_categories' method
-        :param count: count of terms you need to show
-        :param sort_by: you can sort target list by one of 'fdr', 'p_value', 'number_of_genes' parameters
-        :param save: Need to save? Choose True. By default, save in .xlsx format
-        :param savename: work with save=True, name of file
-        :param saveformat: format of saving file: 'xlsx' or 'csv'
+        Function shows top-%count of most enriched terms in %category
+
+        Parameters
+        ----------
+        category : str
+            Name of category. You can check available category by calling 'show_enrichment_categories' method
+        count : int, str
+            count of terms you need to show. Choose "all" or integer number
+        sort_by : str
+            you can sort target list by one of 'fdr', 'p_value', 'number_of_genes' parameters
+        save : bool
+            Need to save? Choose True. By default, save in .xlsx format
+        savename : str
+            work with save=True, name of file
+        saveformat : str
+            format of saving file: 'xlsx' or 'csv'
+        Returns
+        -------
+        None
         """
+        
+        if type(count) != int and count != 'all':
+            raise Exception('Error of "count" variable. Choose "all" or integer number')
         valid_category = self._get_valid_category()
         Check_Value(category, valid_category, 'category')
         Check_Value(sort_by, {'fdr', 'p_value', 'number_of_genes'}, 'sort_by')
 
         table = self.enrichment[self.enrichment.category == category].sort_values(by=sort_by)
+        if count == 'all':
+            count = len(table)
+            
         if save:
             if savename == 'enrichment':
                 savename += '_' + category + '_' + datetime.now().strftime('%m-%d-%Y')
-            self.save_table(table.head(count), savename, saveformat=saveformat, index=False)
+            save_table(table.head(count), savename, saveformat=saveformat, index=False)
         print(f'ENRICHEST TERMS IN CATEGORY "{category}"')
         display_df(table.head(count).drop(['number_of_genes_in_background', 'ncbiTaxonId', 'preferredNames', 'p_value'], axis=1))
         return table
-
-
-    @staticmethod
-    def create_subframe_by_names(df, column: str, names: [list, tuple, set], add: str = 'first'):
-        """
-        function finds rows in original dataset and returns sub-dataframe including input names in selected column
-
-        :param df: target DataFrame
-        :param column: the selected column in which names will be searched
-        :param names: list of target names whose records need to be found in the table
-        :param add: ['first', 'last', 'all'] parameter of adding found rows.
-                    'first' - add only the first entry
-                    'last' - add only the last entry
-                    'all' - add all entries
-        :return: sub-dataframe including input names in selected column
-        """
-        Check_Value(add, {'first', 'last', 'all'}, add)
-
-        def add_all(table, rows):
-            return pd.concat([table, rows])
-
-        def add_first(table, rows):
-            table.loc[len(table)] = rows.iloc[0]
-            return table
-
-        def add_last(table, rows):
-            table.loc[len(table)] = rows.iloc[-1]
-            return table
-
-        adding_method = {'first': add_first,
-                         'last': add_last,
-                         'all': add_all}
-
-        new_df = pd.DataFrame(columns=df.columns)
-        not_found_names = []
-        for name in names:
-            rows = df[df[column] == name]
-            if len(rows) > 0:
-                new_df = adding_method[add](new_df, rows)
-            else: not_found_names.append(name)
-        print(f'{len(not_found_names)} names were not found in the dataframe:\n')
-        print('[', end='')
-        print(*not_found_names, sep=', ', end='')
-        print(']')
-
-        return new_df
-
-    @staticmethod
-    def save_table(table, name, saveformat='xlsx', index:bool = True):
-        """
-        function for saving DataFrame tables
-        :param table: DataFrame
-        :param name: name of file
-        :param saveformat: format of saving file: 'xlsx' or 'csv'
-        :param index: show indexes in saved table?
-        :return:
-        """
-        Check_Value(saveformat, {'csv', 'xlsx'}, 'saveformat')
-        try:
-            if saveformat == 'xlsx':
-                if name[-5:] != '.xlsx' and name[-4:] != '.xls':
-                    name += '.xlsx'
-                table.to_excel(name, index=index)
-            elif saveformat == 'csv':
-                if name[-4:] != '.csv':
-                    name += '.csv'
-                table.to_csv(name, index=index, header=True)
-            print(f'File {name} successfully saved in {os.path.abspath(os.getcwd())}\n')
-        except PermissionError:
-            print('Permission Denied Error: Access is denied. Close file if it`s open and try again')
-        except:
-            print('Saving file isn`t complete. If you rewrite file, close it and try again')

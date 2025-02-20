@@ -2,6 +2,9 @@ import ProteinNetworks as PN
 import pandas as pd
 import stringdb
 import networkx as nx
+import leidenalg as la
+import igraph as ig
+
 from umap import UMAP
 import matplotlib.pyplot as plt
 from math import log
@@ -45,7 +48,7 @@ def create_graph(geneList, interactions_type=None, **kwargs):
     ----------
     **NetworkAnalysis() object** contains graph with nodes from 'geneList'
     """
-
+    
     # check correctness of kwargs
     valid_kwargs = {'taxId', 'required_score', 'included_metrics', 'base_degree', 'neg_exponent'}
     Check_kwargs(kwargs, valid_kwargs)
@@ -53,8 +56,6 @@ def create_graph(geneList, interactions_type=None, **kwargs):
     required_score = kwargs.get('required_score', 400)
     taxId = kwargs.get('taxId', 9606)
     included_metrics = kwargs.get('included_metrics', ['nscore', 'fscore', 'pscore', 'dscore', 'escore', 'ascore', 'tscore'])
-    base_degree = kwargs.get('base_degree', 'x')
-    neg_exponent = kwargs.get('neg_exponent', 2)
     
     mapped_genes = get_mapping(geneList)
     network_obj = NetworkAnalysis(mapped_genes)
@@ -63,12 +64,11 @@ def create_graph(geneList, interactions_type=None, **kwargs):
                                      included_metrics = included_metrics, 
                                      species=taxId,
                                      interactions_type=interactions_type)
-    network_obj.get_edge_list(network_obj.proteins_network, id_type='GeneName', base_degree=base_degree, neg_exponent=neg_exponent)
+    network_obj.get_edge_list(network_obj.proteins_network, id_type='GeneName')
     network_obj.create_graph_from_edge_list(network_obj.edge_list)
-    return network_obj 
+    return network_obj
 
     
-
 class NetworkAnalysis():
     
     id_type_converter = {'stringId': 'stringId', 'GeneName': 'preferredName'}
@@ -192,7 +192,60 @@ class NetworkAnalysis():
         return proteins_network
     
     
-    def get_edge_list(self, network, base_degree='x', neg_exponent=2, id_type='stringId'):
+    # def get_edge_list(self, network, base_degree='x', neg_exponent=2, id_type='stringId'):
+    #     """
+    #     Function for getting adjacency list from STRING network
+    #     weights of edges are calculated as a function of 'score'= x: weight(x) = pow(base_degree, -neg_exponent)
+
+    #     Weights of edges can be represented as an inverse power function 'x**(-a)', where 'a' is a real positive number \
+    #                     or exponential function 'a**(-x)', where 'a' is a real positive number
+
+
+    #     Example: get_edge_list(network, base_degree='x', neg_exponent=2) -> weights(x) = x**(-2)
+    #                 get_edge_list(network, base_degree= np.e, neg_exponent=x) -> weights(x) = np.e**(x)
+        
+        
+    #     Parameters
+    #     ----------
+    #     network : pd.DataFrame
+    #         pd.DataFrame with STRING network
+    #     base_degree : str or int or float
+    #         base of degree in weights(x) function
+    #     neg_exponent : str or int or float
+    #         exponent of degree in weights(x) function
+    #     id_type : str
+    #         'stringId' or 'GeneName'
+        
+    #     Returns
+    #     -------
+    #     pd.DataFrame
+    #         pd.DataFrame with adjacency list
+    #     """
+
+    #     # check parameters
+    #     if not ((isinstance(base_degree, str) and base_degree == 'x' and isinstance(neg_exponent, (int, float)) and neg_exponent > 0) \
+    #         or (isinstance(neg_exponent, str) and neg_exponent == 'x' and isinstance(base_degree, (int, float)) and base_degree > 0)):
+            
+    #         raise ValueError('Wrong parameters: "base_degree" must be "x" or real positive number, \
+    #     "neg_exponent" must be real positive number or "x" respectively')
+
+    #     Check_Value(id_type, {'stringId', 'GeneName'}, 'id_type')
+        
+    #     self.id_type = self.id_type_converter[id_type]
+    #     if self.id_type == 'stringId': names = ['stringId_A', 'stringId_B']
+    #     else: names = ['preferredName_A', 'preferredName_B']
+
+    #     edge_list = pd.DataFrame()
+    #     edge_list[['A', 'B']] = network[names]
+    #     #prevent SettingWithCopyWarning message from appearing
+    #     pd.options.mode.chained_assignment = None
+
+    #     edge_list['weight'] = network['score'].apply(lambda x: pow(eval(str(base_degree)), eval(str('-') + str(neg_exponent))))
+    #     self.edge_list = edge_list
+        
+    #     return edge_list
+
+    def get_edge_list(self, network, id_type='stringId'):
         """
         Function for getting adjacency list from STRING network
         weights of edges are calculated as a function of 'score'= x: weight(x) = pow(base_degree, -neg_exponent)
@@ -222,13 +275,6 @@ class NetworkAnalysis():
             pd.DataFrame with adjacency list
         """
 
-        # check parameters
-        if not ((isinstance(base_degree, str) and base_degree == 'x' and isinstance(neg_exponent, (int, float)) and neg_exponent > 0) \
-            or (isinstance(neg_exponent, str) and neg_exponent == 'x' and isinstance(base_degree, (int, float)) and base_degree > 0)):
-            
-            raise ValueError('Wrong parameters: "base_degree" must be "x" or real positive number, \
-        "neg_exponent" must be real positive number or "x" respectively')
-
         Check_Value(id_type, {'stringId', 'GeneName'}, 'id_type')
         
         self.id_type = self.id_type_converter[id_type]
@@ -239,11 +285,20 @@ class NetworkAnalysis():
         edge_list[['A', 'B']] = network[names]
         #prevent SettingWithCopyWarning message from appearing
         pd.options.mode.chained_assignment = None
-        edge_list['weight'] = network['score'].apply(lambda x: pow(eval(str(base_degree)), eval(str('-') + str(neg_exponent))))
+
+        edge_list['weight'] = self.weight_modify(network['score'])
         self.edge_list = edge_list
         
         return edge_list
-
+    
+    @staticmethod
+    def weight_modify(series, mode='None'):
+        if mode == 'None':
+            return series
+        if mode == 'square':
+            return series.apply(lambda x: pow(x, 2))
+    
+    
     def create_graph_from_edge_list(self, edge_list, weighted:bool=True):
         """
         Create graph from edge list
@@ -290,6 +345,7 @@ class NetworkAnalysis():
         return count_degree.sort_values(by='#interactions', ascending=False)
     
     def clustering(self, method:str='louvain', weight:str='weight'):
+        print(2)
         
         """
         Function for clustering proteins in graph using several methods.
@@ -311,7 +367,10 @@ class NetworkAnalysis():
             clusters = nx.community.k_clique_communities(self.graph, k=4)
         elif method == 'greedy_modularity':
             clusters = nx.community.greedy_modularity_communities(self.graph, weight=weight)
-        else: raise Exception('Wrong method name. Use: "louvain", k_clique", "greedy_modularity"')
+        elif method == 'leiden':
+            g = ig.Graph.TupleList([(u, v, float(weight)) for u, v, weight in self.graph.edges(data='weight')], weights=True)
+            clusters = la.find_partition(g, la.ModularityVertexPartition, weights='weight')
+        else: raise Exception('Wrong method name. Use: "louvain", "k_clique", "greedy_modularity", "leiden')
         
         self.graph.clusters = clusters
         
@@ -381,6 +440,8 @@ class NetworkAnalysis():
             *edge_color*: string. Color of the edge. Default: 'lightgray'
             
             *palette*: string. Choose one of this color palettes for coloring clusters: https://matplotlib.org/stable/users/explain/colors/colormaps.html
+            
+            *view_labels*: bool. True = show labels (node names)
             
             *dpi*: int. Work with 'save'=True. Dpi of saving image
             

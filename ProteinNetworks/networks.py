@@ -345,7 +345,6 @@ class NetworkAnalysis():
         return count_degree.sort_values(by='#interactions', ascending=False)
     
     def clustering(self, method:str='louvain', weight:str='weight'):
-        print(2)
         
         """
         Function for clustering proteins in graph using several methods.
@@ -364,12 +363,14 @@ class NetworkAnalysis():
         if method == 'louvain':
             clusters = nx.community.louvain_communities(self.graph, weight=weight)
         elif method == 'k_clique':
-            clusters = nx.community.k_clique_communities(self.graph, k=4)
+            clusters = list(nx.community.k_clique_communities(self.graph, k=4))
         elif method == 'greedy_modularity':
             clusters = nx.community.greedy_modularity_communities(self.graph, weight=weight)
         elif method == 'leiden':
             g = ig.Graph.TupleList([(u, v, float(weight)) for u, v, weight in self.graph.edges(data='weight')], weights=True)
-            clusters = la.find_partition(g, la.ModularityVertexPartition, weights='weight')
+            output = list(la.find_partition(g, la.ModularityVertexPartition, weights='weight'))
+            nodelist = [vertex['name'] for vertex in g.vs]
+            clusters = [{nodelist[i] for i in cluster} for cluster in output]
         else: raise Exception('Wrong method name. Use: "louvain", "k_clique", "greedy_modularity", "leiden')
         
         self.graph.clusters = clusters
@@ -485,6 +486,8 @@ class NetworkAnalysis():
 
         nx.draw_networkx_edges(self.graph, pos, alpha=0.5, edge_color=edge_color)
         
+        
+        
         if view_labels:
             for node in self.graph.nodes:
                 plt.text(pos[node][0], pos[node][1], 
@@ -493,6 +496,12 @@ class NetworkAnalysis():
                         fontsize=font_size,
                         color=font_color,
                         fontweight='bold')
+                
+        if clusterList is not None:
+            unique_clusters = clusterList.unique()
+            legend_elements = [plt.Line2D([0], [0], marker='o', color='w', label=f'Cluster {cluster}',
+                                  markerfacecolor=cmap(i / num_clusters), markersize=node_size) for i, cluster in enumerate(unique_clusters)]
+            plt.legend(handles=legend_elements, title="Clusters")
 
         plt.axis('off')
         if save:

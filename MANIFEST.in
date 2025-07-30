@@ -1,2 +1,0 @@
-recursive-include ProteinNetworks/RScripts *.R
-recursive-include ProteinNetworks/BioGRID *

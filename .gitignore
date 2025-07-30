@@ -1,8 +1,0 @@
-/ProteinNetworks/__pycache__
-.gitignore
-/build
-/dist
-/ProteinNetworks.egg-info
-MANIFEST.in
-*.pyc
-*.pyo

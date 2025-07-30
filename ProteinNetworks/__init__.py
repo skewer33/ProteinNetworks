@@ -9,4 +9,4 @@ from .interactions import get_interactors_from_biogrid, get_interactors_from_str
     get_interactionsTable_from_biogrid, get_interactionsTable_from_stringdb, \
         merging_interactors_stringdb_and_biogrid, get_interactors
         
-    
+__version__ = "0.1.6"

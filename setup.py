@@ -1,12 +1,28 @@
 from setuptools import setup, find_packages
+import re
+from pathlib import Path
 
 def readme():
   with open('README.md', 'r', encoding="utf-8") as f:
     return f.read()
 
+def get_version():
+    init_path = Path(__file__).parent / 'ProteinNetworks' / '__init__.py'
+    content = init_path.read_text()
+    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]", content, re.M)
+    if version_match:
+        return version_match.group(1)
+    raise RuntimeError("Cannot find version in __init__.py")
+  
+
+def get_requirements():
+    req_path = Path(__file__).parent / 'requirements.txt'
+    with req_path.open() as f:
+        return [line.strip() for line in f if line.strip() and not line.startswith('#')]
+  
 setup(
   name='ProteinNetworks',
-  version='0.1.5',
+  version=get_version(),
   author='Mokin Yakov',
   author_email='mokinyakov@mail.ru',
   description='Module for working with protein networks (gene ontology, enrichment, protein-protein interactions, etc.)',
@@ -14,14 +30,7 @@ setup(
   long_description_content_type='text/markdown',
   url='https://github.com/skewer33/ProteinNetworks.git',
   packages=find_packages(),
-  install_requires=[
-    'pandas>=2.0.1',
-    'stringdb==0.1.5',
-    'tabulate==0.9.0',
-    'umap-learn>=0.5.2',
-    'networkx>=3.4.1',
-    'matplotlib>=3.9.1',
-    'biogridpy==0.1.1'],
+  install_requires=get_requirements(),
   classifiers=[
     'Programming Language :: Python :: 3.12',
     'License :: OSI Approved :: MIT License',

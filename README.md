@@ -1,203 +1,189 @@
 # ProteinNetworks
 
-The library contains convenient tools for rapid analysis of gene ontology, enrichment and protein-protein interaction data. Based on the [`stringdb`](https://pypi.org/project/stringdb/) library. Some features require you to install [R](https://www.r-project.org/) to work (see [`EnrichmentAnalysis.prioretizingGO()`](#prioretizingGO))
+The library provides convenient tools for rapid analysis of gene ontology data, enrichment, and protein-protein interactions. It is based on [`stringdb`](https://pypi.org/project/stringdb/). Some functions require [R](https://www.r-project.org/) to be installed (see [`EnrichmentAnalysis.prioretizingGO()`](#prioretizingGO)).
 
-### The module will contain 4 sets of tools:
-  * **Enrichment Analysis** 
-  * **Protein networks Analysis**
-  * **Group comparing tools**
-  * **Visualization tools**
+## Library Modules
 
-## Get Started
+- **Enrichment** – functions for enrichment analysis
+- **Protein Networks** – functions for working with and analyzing protein-protein interaction networks
+- **Interactors** – functions for searching interactors for target proteins
 
-`pip install -i https://test.pypi.org/simple/ ProteinNetworks==0.1.3`
+## Installation
 
-## Contents:
+```bash
+pip install git+https://github.com/skewer33/ProteinNetworks.git
+```
 
-* [Enrichment Analysis](#EnrichmentAnalysis)
+## Contents
 
-  * module: [`ProteinNetworks.STRING_enrichment`](#STRING_enrichment)
-    * class:  [`EnrichmentAnalysis`](#classEnrichmentAnalysis)
-    
-      methods:
-      * [`EnrichmentAnalysis.create_subframe_by_names()`](#create)
-      * [`EnrichmentAnalysis.drop_duplicated_genes()`](#drop_duplicated_genes)
-      * [`EnrichmentAnalysis.get_category_terms()`](#get_category_terms)
-      * [`EnrichmentAnalysis.get_enrichment()`](#get_enrichment)
-      * [`EnrichmentAnalysis.get_genes_by_localization()`](#get_genes_by_localization)
-      * [`EnrichmentAnalysis.get_genes_of_term()`](#get_genes_of_term)
-      * [`EnrichmentAnalysis.get_mapped()`](#get_mapped)
-      * [`EnrichmentAnalysis.prioretizingGO()`](#prioretizingGO)
-      * [`EnrichmentAnalysis.proteins_participation_in_the_category()`](#proteins_participation_in_the_category)
-      * [`EnrichmentAnalysis.save_table()`](#save_table)
-      * [`EnrichmentAnalysis.show_category_terms()`](#show_category_terms)
-      * [`EnrichmentAnalysis.show_enrichest_terms_in_category()`](#show_enrichest_terms_in_category)
-      * [`EnrichmentAnalysis.show_enrichment_categories()`](#show_enrichment_categories)
+- [Enrichment](#Enrichment)
+- [Protein Networks](#ProteinNetworksAnalysis)
+- [Mapping Tools](#MappingTools)
+- [Interaction](#InteractionTools)
+- [Helper Functions](#Wrappers)
+- [Usage Examples](#usage-example)
+- [Links](#links)
 
+---
 
-_________________________
+# <a name='Enrichment'></a> Enrichment
 
+Module: [`ProteinNetworks.enrichment`](ProteinNetworks/enrichment.py)
 
-# <a name='EnrichmentAnalysis'></a> Enrichment Analysis
-Contains a set of functions based on the stringdb library for gene ontology analysis and enrichment analysis
-Look examples in [Colab Notebook](https://drive.google.com/file/d/1JlcrtDNwOVLuKmwDy4apfIpt7Mheu4cF/view?usp=sharing)
+### Class [`EnrichmentAnalysis`](#classEnrichmentAnalysis)
 
+**Constructor parameters:**
+- `data`: DataFrame with protein identifiers (column "Gene" or "UniProtID")
+- `enrichment`: DataFrame with results of previous enrichment analysis (optional)
+- `protein_id_type`: type of protein identifier (`'Gene'` or `'UniProtID'`)
 
-## <a name='STRING_enrichment'></a> ProteinNetworks.STRING_enrichment module
+#### Methods:
 
+- **create_subframe_by_names(df, column, names, add='first')**  
+  Returns a subtable by a list of values in the selected column.
 
-### <a name="classEnrichmentAnalysis"></a> *class* ProteinNetworks.STRING_enrichment.EnrichmentAnalysis *(data, enrichment=None, protein_id_type='UniProtID')*
+- **drop_duplicated_genes(subset=None, silent=False)**  
+  Removes duplicate genes.
 
-Bases: `object`
+- **get_category_terms(category, term_type='id')**  
+  Returns a set of all terms in the selected category (`id` or `description`).
 
-EnrichmentAnalysis class.
-* **Parameters:**
-  * **data:** Dataframe containing the protein ID for analysis. It must contain either a “Gene” or “UniProtID” column’
-  * **enrichment:** Dataframe containing the results of previous enrichment analysis
-  * **protein_id_type:** type of protein ID. Valid Types
+- **get_enrichment()**  
+  Performs enrichment analysis, result is saved in `self.enrichment`.
 
-#### <a name="create"></a>*static* create_subframe_by_names(df, column: str, names: [<class 'list'>, <class 'tuple'>, <class 'set'>], add: str = 'first')
+- **get_genes_by_localization(compartments, set_operation, save=False)**  
+  Gets proteins localized in specified compartments, with set operations.
 
-function finds rows in original dataset and returns sub-dataframe including input names in selected column
+- **get_genes_of_term(term)**  
+  Returns a list of genes associated with the selected term.
 
-* **Parameters:**
-  * **df** – target DataFrame
-  * **column** – the selected column in which names will be searched
-  * **names** – list of target names whose records need to be found in the table
-  * **add** – [‘first’, ‘last’, ‘all’] parameter of adding found rows.
-    ‘first’ - add only the first entry
-    ‘last’ - add only the last entry
-    ‘all’ - add all entries
-* **Returns:**
-  sub-dataframe including input names in selected column
+- **get_mapped(species=9606)**  
+  Gene mapping: search for STRINGid by protein id.
 
-#### <a name="drop_duplicated_genes"></a> drop_duplicated_genes(silent=False)
+- **prioretizingGO(terms, organism='Human', domain='BP')**  
+  GO term prioritization using an R script (GOxploreR).
 
-function for droppig dublicated genes
-* **Parameters:**
-  * **subset:** (list) Only consider certain columns for identifying duplicates, by default use all columns.
-return: df of dropped genes
+- **proteins_participation_in_the_category(df, category, term_type='id', term_sep='\n')**  
+  Statistics on protein participation in category terms.
 
-#### <a name="get_category_terms"></a> get_category_terms(category: str, term_type: str = 'id')
+- **save_table(table, name, saveformat='xlsx', index=True)**  
+  Saves DataFrame to file.
 
-function returns set of all terms in chosen category
-* **Parameters:**
-  * **category:** Name of category
-  * **term_type:** ‘id’ or ‘description’.
+- **show_category_terms(category, show=10, sort_by='genes', save=False, savename='terms', saveformat='xlsx')**  
+  Shows all terms and the number of associated genes in the category.
 
-    > id - returns terms IDs of category (for example, GO terms) 
-    > 
-    > description - returns Description of IDs of category
-* **Returns:**
-  set of terms
+- **show_enrichest_terms_in_category(category, count=10, sort_by='fdr', save=False, savename='enrichment', saveformat='xlsx')**  
+  Shows the top-%count most enriched terms in the category.
 
-#### <a name="get_enrichment"></a> get_enrichment()
+- **show_enrichment_categories()**  
+  Shows available enrichment categories for the current dataset.
 
-function performs enrichment analysis. Results store in self.enrichment
-* **Returns:** None
+---
 
-#### <a name="get_genes_by_localization"></a> get_genes_by_localization(compartments: list, set_operation: str, save=False)
+# <a name='ProteinNetworks'></a> Protein Networks
 
-function for getting proteins localized in target compartments. You also can do common set operations
-under compartments genes
-> Example: *get_genes_by_localization([Nucleus, Cytosol], ‘union’)*  - return proteins localized in Nucleus or Cytosol
+Module: [`ProteinNetworks.networks`](ProteinNetworks/networks.py)
 
-* **Parameters:**
-  * **compartments:** list of compartments. **Will be attention**:
-    1. Capitalization of letters matters. Get available compartment names by calling *get_components_list()*.
+### Class [`NetworkAnalysis`](#classNetworkAnalysis)
 
-    2. Order of compartments matter if you want to get sets difference.
-  * **set_operation:** operation between sets. This means that the operations will be applied sequentially to all
-         sets from the compartments. *[**A**, **B**, **C**], 'intersection' **->** **A** and **B** and **C***
+**Constructor parameters:**
+- `data`: DataFrame with proteins and their interactions
+- `directed`: directed graph (bool)
+- `weighted`: weighted graph (bool)
 
-    >  For example:
-    > 
-      > *get_genes_by_localization([‘Nucleus’, ‘Cytosol’], ‘difference’)* -  return just nucleus proteins,
-       *get_genes_by_localization([‘Cytosol’, ‘Nucleus’], ‘union’)* - return cytosol and nucleus proteins.
-       *get_genes_by_localization([‘all’, ‘Nucleus’], ‘difference’)* - return all proteins except nucleus proteins.
+#### Methods:
 
-#### <a name="get_genes_of_term"></a> get_genes_of_term(term: str)
+- **create_graph(data, directed=False, weighted=False)**  
+  Creates a protein interaction graph (networkx.Graph).
 
-function get genes from enrichment table by target term
-* **Parameters:**
-  * **term**: target GO term from column ‘term’ in enrichment table
-* **Returns:** list of genes associated with target term
+- **get_subgraph_by_genes(genes)**  
+  Returns a subgraph by a list of genes.
 
-#### <a name="get_mapped"></a> get_mapped(species=9606)
-function makes gene mapping, it finds STRINGids by protein ids. It`s important for future analysis
-* **Parameters:**
-  * **species:** ID of organism. For example, Human species=9606
-* **Returns:** None
+- **get_connected_components()**  
+  Returns connected components of the graph.
 
-#### <a name="prioretizingGO"></a> prioretizingGO(terms: [<class 'list'>, <class 'set'>], organism='Human', domain='BP')
+- **get_degree_centrality()**  
+  Node degree centrality.
 
-function for prioretizing GO-terms using R script with [GOxploreR](https://cran.r-universe.dev/GOxploreR/doc/manual.html) package ([doi:10.1038/s41598-020-73326-3](https://www.nature.com/articles/s41598-020-73326-3))
-See ‘RScript Prioretizing_GO.R’
-work with R.4-3.x. Yoy need to add RScript in PATH
+- **get_betweenness_centrality()**  
+  Betweenness centrality.
 
-If you use this function in google-collab, you will have to install R-packages at the first launch.
-This may take a long time (up to 20 minutes)
+- **get_closeness_centrality()**  
+  Closeness centrality.
 
-* **Parameters:**
-  * **terms** – list of GO-terms
-  * **organism** – name of target organism
-  * **domain** – name of domain in GO-graph. Available inputs: ‘BP’ - Biological Process
-    ‘CC’ - Cellular Component
-    “MF” - Molecular Functions
-* **Returns:**
-  list of Prioretized GO terms
+- **draw_network(layout='spring', node_color='skyblue', with_labels=True, figsize=(10, 10))**  
+  Network visualization.
 
-#### <a name="proteins_participation_in_the_category"></a> proteins_participation_in_the_category(df, category, term_type='id', term_sep='\\n')
+---
 
-function check terms that proteins participated and make statistics table
-* **Parameters:**
-  * **df:** target DataFrame
-  * **category:** Name of category
-  * **term_type:** ‘id’ or ‘description’.
+# <a name='MappingTools'></a> Mapping Tools
 
-    > id - returns terms IDs of category (for example, GO terms) 
-    > 
-    > description - returns Description of IDs of category
-  * **term_sep:** terms connected with each protein will save in one cell. Choose separator beetwen terms
-* **Returns:** None
+Module: [`ProteinNetworks.mapping`](ProteinNetworks/mapping.py)
 
-#### <a name="save_table"></a> *static* save_table(table, name, saveformat='xlsx', index: bool = True)
+#### Main functions:
 
-function for saving DataFrame tables
-* **Parameters:**
-  * **table**: DataFrame
-  * **name**: name of file
-  * **saveformat**: format of saving file: ‘xlsx’ or ‘csv’
-  * **index**: show indexes in saved table?
-* **Returns:** None
+- **get_mapping(df, from_id, to_id, species=9606)**  
+  Protein identifier mapping (get STRINGid by Gene or UniProtID). 
+---
 
-#### <a name="show_category_terms"></a> show_category_terms(category: str, show: [<class 'int'>, <class 'str'>] = 10, sort_by='genes', save: bool = False, savename='terms', saveformat='xlsx')
+# <a name='InteractionTools'></a> Interaction Tools
 
-function displays  all terms and number of associated genes in category
-* **Parameters:**
-  * **category:** Name of category. You can check available category by calling ‘show_enrichment_categories’ method
-  * **show:** “all” or integer number. Number of strings to display
-  * **sort_by:** [“genes”, “term”] - sort by number of genes (by descending) or term names (by ascending)
-  * **save:** Need to save? Choose True. By default, save in .xlsx format
-  * **savename:** work with save=True, name of file
-  * **saveformat:** format of saving file: ‘xlsx’ or ‘csv’
-* **Returns:** None
+Module: [`ProteinNetworks.interactions`](ProteinNetworks/interactions.py)
 
-#### <a name="show_enrichest_terms_in_category"></a> show_enrichest_terms_in_category(category: str, count: int = 10, sort_by='fdr', save: bool = False, savename='enrichment', saveformat='xlsx')
+#### Main functions:
 
-function shows top-%count of most enriched terms in %category
-* **Parameters:**
-  * **category:** Name of category. You can check available category by calling ‘show_enrichment_categories’ method
-  * **count:** count of terms you need to show
-  * **sort_by:** you can sort target list by one of ‘fdr’, ‘p_value’, ‘number_of_genes’ parameters
-  * **save:** Need to save? Choose True. By default, save in .xlsx format
-  * **savename:** work with save=True, name of file
-  * **saveformat:** format of saving file: ‘xlsx’ or ‘csv’
-* **Returns:** None
+- **get_interactors_from_biogrid(genes, species=9606)**  
+  Get interactions from the BioGRID database.
 
-#### <a name="show_enrichment_categories"></a> show_enrichment_categories()
+- **get_interactors_from_stringdb(genes, species=9606)**  
+  Get interactions from STRINGdb.
 
-function shown available enrichment categories for current dataset
-* **Returns:** None
+- **get_interactionsTable_from_biogrid(genes, species=9606)**  
+  Interaction table from BioGRID.
+
+- **get_interactionsTable_from_stringdb(genes, species=9606)**  
+  Interaction table from STRINGdb.
+
+- **merging_interactors_stringdb_and_biogrid(genes, species=9606)**  
+  Merge interaction data from both databases.
+
+- **get_interactors(genes, source='stringdb', species=9606)**  
+  Universal interface for obtaining interactions.
+
+---
+
+# <a name='Wrappers'></a> Helper Functions
+
+Module: [`ProteinNetworks.wrappers`](ProteinNetworks/wrappers.py)
+
+- **Check_Value(value, valid_values, name)**  
+  Value validation.
+
+- **save_table(table, name, saveformat='xlsx', index=True)**  
+  Save table.
+
+- **create_subframe_by_names(df, column, names, add='first')**  
+  Search for rows by a list of names.
+
+---
 
 
+## Usage Example
+
+```python
+import pandas as pd
+from ProteinNetworks import get_enrichment
+
+df = pd.read_csv('your_proteins.csv')
+enrich_obj = get_enrichment(df, protein_id_type='Gene', species=9606)
+enrich_obj.show_enrichment_categories()
+```
+See more examples in [Google Colab](https://drive.google.com/file/d/1JlcrtDNwOVLuKmwDy4apfIpt7Mheu4cF/view?usp=sharing)
+
+---
+
+## Links
+
+- [stringdb documentation](https://pypi.org/project/stringdb/)
+- [GOxploreR](https://cran.r-universe.dev/GOxploreR/doc/manual.html)
+- [Colab Notebook (example)](https://drive.google.com/file/d/1JlcrtDNwOVLuKmwDy4apfIpt7Mheu4cF/view?usp=sharing)

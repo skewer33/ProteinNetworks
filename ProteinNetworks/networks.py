@@ -17,6 +17,7 @@ INTERACTIONS_TYPE = {'STRINGdb':{
                         'all':{'included_metrics': ['nscore', 'fscore', 'pscore', 'dscore', 'escore', 'ascore', 'tscore']}},
                     }
 
+STRINGDB_METRICS = ['nscore', 'fscore', 'pscore', 'dscore', 'escore', 'ascore', 'tscore']
 
 def create_graph(geneList, interactions_type=None, **kwargs):
     """
@@ -39,10 +40,6 @@ def create_graph(geneList, interactions_type=None, **kwargs):
         Organism id. Human = 9606
     **included_metrics** : *list*, optional.
         List of metrics you want to include in total score. Default is ['nscore', 'fscore', 'pscore', 'dscore', 'escore', 'ascore', 'tscore']
-    **base_degree** : *str or int or float, optional.*
-        Base of degree in weights(x) function (see *get_edge_list()* function)
-    **neg_exponent** : *str or int or float, optional.*
-        Exponent of degree in weights(x) function (see *get_edge_list()* function)
         
     Returns
     ----------
@@ -50,18 +47,18 @@ def create_graph(geneList, interactions_type=None, **kwargs):
     """
     
     # check correctness of kwargs
-    valid_kwargs = {'taxId', 'required_score', 'included_metrics', 'base_degree', 'neg_exponent'}
+    valid_kwargs = {'taxId', 'required_score', 'included_metrics', 'score_threshold', 'base_degree', 'neg_exponent'}
     Check_kwargs(kwargs, valid_kwargs)
  
     required_score = kwargs.get('required_score', 400)
     taxId = kwargs.get('taxId', 9606)
-    included_metrics = kwargs.get('included_metrics', ['nscore', 'fscore', 'pscore', 'dscore', 'escore', 'ascore', 'tscore'])
-    
+    included_metrics = kwargs.get('included_metrics', STRINGDB_METRICS)
+
     mapped_genes = get_mapping(geneList)
     network_obj = NetworkAnalysis(mapped_genes)
     network_obj.get_proteins_network(identifiers=network_obj.orig_data.stringId, 
                                      required_score=required_score, 
-                                     included_metrics = included_metrics, 
+                                     included_metrics = included_metrics,
                                      species=taxId,
                                      interactions_type=interactions_type)
     network_obj.get_edge_list(network_obj.proteins_network, id_type='GeneName')
@@ -128,7 +125,7 @@ class NetworkAnalysis():
             pd.Series with total score
         """
 
-        metrics_list = {'nscore', 'fscore', 'pscore', 'dscore', 'escore', 'ascore', 'tscore'}
+        metrics_list = set(STRINGDB_METRICS)
         for col in data.columns:
             Check_Value(col, metrics_list.union(['score']), ' ', message = f'Wrong column in data variable! \
                                             It must contain only {metrics_list.union(["score"])} columns')
@@ -151,6 +148,7 @@ class NetworkAnalysis():
                 species=9606, 
                 required_score=400,
                 included_metrics=['dscore', 'escore', 'ascore', 'tscore'], 
+                score_threshold=None,
                 p:float=0.041,
                 interactions_type=None):
     
@@ -190,60 +188,6 @@ class NetworkAnalysis():
         self.data['node'] = self.data['preferredName']
 
         return proteins_network
-    
-    
-    # def get_edge_list(self, network, base_degree='x', neg_exponent=2, id_type='stringId'):
-    #     """
-    #     Function for getting adjacency list from STRING network
-    #     weights of edges are calculated as a function of 'score'= x: weight(x) = pow(base_degree, -neg_exponent)
-
-    #     Weights of edges can be represented as an inverse power function 'x**(-a)', where 'a' is a real positive number \
-    #                     or exponential function 'a**(-x)', where 'a' is a real positive number
-
-
-    #     Example: get_edge_list(network, base_degree='x', neg_exponent=2) -> weights(x) = x**(-2)
-    #                 get_edge_list(network, base_degree= np.e, neg_exponent=x) -> weights(x) = np.e**(x)
-        
-        
-    #     Parameters
-    #     ----------
-    #     network : pd.DataFrame
-    #         pd.DataFrame with STRING network
-    #     base_degree : str or int or float
-    #         base of degree in weights(x) function
-    #     neg_exponent : str or int or float
-    #         exponent of degree in weights(x) function
-    #     id_type : str
-    #         'stringId' or 'GeneName'
-        
-    #     Returns
-    #     -------
-    #     pd.DataFrame
-    #         pd.DataFrame with adjacency list
-    #     """
-
-    #     # check parameters
-    #     if not ((isinstance(base_degree, str) and base_degree == 'x' and isinstance(neg_exponent, (int, float)) and neg_exponent > 0) \
-    #         or (isinstance(neg_exponent, str) and neg_exponent == 'x' and isinstance(base_degree, (int, float)) and base_degree > 0)):
-            
-    #         raise ValueError('Wrong parameters: "base_degree" must be "x" or real positive number, \
-    #     "neg_exponent" must be real positive number or "x" respectively')
-
-    #     Check_Value(id_type, {'stringId', 'GeneName'}, 'id_type')
-        
-    #     self.id_type = self.id_type_converter[id_type]
-    #     if self.id_type == 'stringId': names = ['stringId_A', 'stringId_B']
-    #     else: names = ['preferredName_A', 'preferredName_B']
-
-    #     edge_list = pd.DataFrame()
-    #     edge_list[['A', 'B']] = network[names]
-    #     #prevent SettingWithCopyWarning message from appearing
-    #     pd.options.mode.chained_assignment = None
-
-    #     edge_list['weight'] = network['score'].apply(lambda x: pow(eval(str(base_degree)), eval(str('-') + str(neg_exponent))))
-    #     self.edge_list = edge_list
-        
-    #     return edge_list
 
     def get_edge_list(self, network, id_type='stringId'):
         """
@@ -454,16 +398,16 @@ class NetworkAnalysis():
         valid_kwargs = {'figsize','node_size', 'node_color', 'node_edge_color', 'edge_color', 'font_size', 'font_color', 'view_labels', 'palette', 'pos', 'dpi'}
         Check_kwargs(kwargs, valid_kwargs)
     
-        figsize = kwargs.get('figsize', (10, 10))
-        node_size = kwargs.get('node_size', 50)
-        unicolor_node_color = kwargs.get('node_color', '#B897D5')
-        font_size = kwargs.get('font_size', 5)
-        font_color = kwargs.get('font_color', '#222222')
-        edge_color = kwargs.get('edge_color', 'lightgray')
-        view_labels = kwargs.get('view_labels', True)
-        palette = kwargs.get('palette', 'rainbow')
-        dpi = kwargs.get('dpi', 400)
-    
+        figsize = kwargs.get('figsize', (10, 10)) # size of figure
+        node_size = kwargs.get('node_size', 50) # size of nodes
+        unicolor_node_color = kwargs.get('node_color', '#B897D5') # color of nodes (if clusterList is None)
+        font_size = kwargs.get('font_size', 5) # size of font
+        font_color = kwargs.get('font_color', '#222222') # color of font
+        edge_color = kwargs.get('edge_color', 'lightgray') # color of edges
+        view_labels = kwargs.get('view_labels', True) # show labels, bool
+        palette = kwargs.get('palette', 'rainbow') # color palette for clusters
+        dpi = kwargs.get('dpi', 400) # dpi of saving image
+        lgnd_markersize = (node_size // 2) + 1 # size of markers in legend
         
         if clusterList is not None:
             clusters = list(map(lambda x: clusterList[clusterList.index == x].iloc[0], self.graph.nodes()))
@@ -500,7 +444,7 @@ class NetworkAnalysis():
         if clusterList is not None:
             unique_clusters = clusterList.unique()
             legend_elements = [plt.Line2D([0], [0], marker='o', color='w', label=f'Cluster {cluster}',
-                                  markerfacecolor=cmap(i / num_clusters), markersize=node_size) for i, cluster in enumerate(unique_clusters)]
+                                  markerfacecolor=cmap(i / num_clusters), markersize=lgnd_markersize) for i, cluster in enumerate(unique_clusters)]
             plt.legend(handles=legend_elements, title="Clusters")
 
         plt.axis('off')

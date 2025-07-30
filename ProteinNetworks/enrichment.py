@@ -314,7 +314,7 @@ class EnrichmentAnalysis:
         if len(self.overmapped_genes) < 80:
             print('List of overmapped genes:\n', list(self.overmapped_genes))
 
-    def get_terms_prioretizing(self, category, sorting_results=True, ascending=False):
+    def get_terms_prioretizing(self, category, sorting_results=True, ascending=False, organism='Human'):
         
         """
         Function for prioretizing GO-terms from choosen category
@@ -331,11 +331,24 @@ class EnrichmentAnalysis:
         **pd.DataFrame** enrichment table of prioretized Terms, stored in *self.prior_enrichment[category]*
         """
         #check validness of category
-        valid_category = self._get_valid_category()
-        Check_Value(category, valid_category, 'category')
+        #valid_category = self._get_valid_category()
+        #Check_Value(category, valid_category, 'category')
+        # вызывает проблему тем, что в случае отсутствия термина не создаёт таблицу
         
-        GO_terms = self.get_category_terms(category)
-        prior_GO_terms = self.prioretizingGO(GO_terms)
+        category2domain = {'Process': 'BP', 'Function': 'MF', 'Component' : 'CC'}
+        
+        try:
+            domain = category2domain[category]
+        except:
+            raise Exception('Invalid category name. Choose one of: "Process", "Function", "Component"')
+        
+        try: 
+            GO_terms = self.get_category_terms(category)
+        except: 
+            self.prior_enrichment[category] = pd.DataFrame(columns=[self.enrichment.columns])
+            return self.prior_enrichment[category]
+        
+        prior_GO_terms = self.prioretizingGO(GO_terms, organism=organism, domain=domain)
         try:
             self.prior_enrichment[category] = create_subframe_by_names(self.enrichment, column='term', names=prior_GO_terms)
         except:
@@ -388,7 +401,7 @@ class EnrichmentAnalysis:
         path2file = os.path.abspath('input_priority_terms.csv')
 
         # Variable number of args in a list
-        args = [path2file, 'Human', 'BP']
+        args = [path2file, organism, domain]
         # Build subprocess command
         cmd = [command, path2script] + args
         # check_output will run the command and store to result

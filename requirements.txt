@@ -1,10 +1,9 @@
-pandas>=2.0.1
+pandas==2.3.1
 stringdb==0.1.5
 tabulate==0.9.0
-umap-learn>=0.5.2
-networkx>=3.4.1
-matplotlib>=3.9.1
+networkx==3.4.1
+matplotlib==3.9.1
 biogridpy==0.1.1
 leidenalg==0.10.2
 igraph==0.11.9
-umap-learn>=0.5.9
+umap-learn==0.5.9.post2

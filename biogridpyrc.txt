@@ -1,2 +1,0 @@
-[BioGRID_ak] 
-access_key = f6ae8454b5faf38b7c27dc2c259be3ce

@@ -30,7 +30,14 @@ setup(
   long_description_content_type='text/markdown',
   url='https://github.com/skewer33/ProteinNetworks.git',
   packages=find_packages(),
-  install_requires=get_requirements(),
+  # split requirements: keep lightweight essentials in install_requires
+  _reqs = get_requirements()
+  _heavy = {'matplotlib', 'leidenalg', 'igraph', 'umap-learn', 'python-igraph'}
+  install_requires=[r for r in _reqs if r.split('==')[0] not in _heavy],
+  # allow optional installation of heavy/compiled deps via extras, e.g. pip install .[full]
+  extras_require={
+      'full': [r for r in _reqs if r.split('==')[0] in _heavy],
+  },
   classifiers=[
     'Programming Language :: Python :: 3.12',
     'License :: OSI Approved :: MIT License',
